@@ -16,175 +16,156 @@
 
 package org.springframework.ai.mcp;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiPredicate;
 
-import io.modelcontextprotocol.client.McpAsyncClient;
+import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
-import io.modelcontextprotocol.util.Assert;
-import reactor.core.publisher.Flux;
 
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.support.ToolUtils;
+import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
 /**
  * Implementation of {@link ToolCallbackProvider} that discovers and provides MCP tools
- * asynchronously from one or more MCP servers.
+ * from one or more MCP servers.
  * <p>
  * This class acts as a tool provider for Spring AI, automatically discovering tools from
  * multiple MCP servers and making them available as Spring AI tools. It:
  * <ul>
- * <li>Connects to MCP servers through async clients</li>
- * <li>Lists and retrieves available tools from each server asynchronously</li>
- * <li>Creates {@link AsyncMcpToolCallback} instances for each discovered tool</li>
+ * <li>Connects to one or more MCP servers through sync clients</li>
+ * <li>Lists and retrieves available tools from all connected servers</li>
+ * <li>Creates {@link SyncMcpToolCallback} instances for each discovered tool</li>
  * <li>Validates tool names to prevent duplicates across all servers</li>
  * </ul>
  * <p>
  * Example usage with a single client:
  *
  * <pre>{@code
- * McpAsyncClient mcpClient = // obtain MCP client
- * ToolCallbackProvider provider = new AsyncMcpToolCallbackProvider(mcpClient);
+ * McpSyncClient mcpClient = // obtain MCP client
+ * ToolCallbackProvider provider = new SyncMcpToolCallbackProvider(mcpClient);
  *
  * // Get all available tools
  * ToolCallback[] tools = provider.getToolCallbacks();
  * }</pre>
- *
+ * <p>
  * Example usage with multiple clients:
  *
  * <pre>{@code
- * List<McpAsyncClient> mcpClients = // obtain multiple MCP clients
- * ToolCallbackProvider provider = new AsyncMcpToolCallbackProvider(mcpClients);
+ * List<McpSyncClient> mcpClients = // obtain multiple MCP clients
+ * ToolCallbackProvider provider = new SyncMcpToolCallbackProvider(mcpClients);
  *
  * // Get tools from all clients
  * ToolCallback[] tools = provider.getToolCallbacks();
- *
- * // Or use the reactive API
- * Flux<ToolCallback> toolsFlux = AsyncMcpToolCallbackProvider.asyncToolCallbacks(mcpClients);
  * }</pre>
  *
  * @author Christian Tzolov
- * @since 1.0.0
  * @see ToolCallbackProvider
- * @see AsyncMcpToolCallback
- * @see McpAsyncClient
+ * @see SyncMcpToolCallback
+ * @see McpSyncClient
+ * @since 1.0.0
  */
-public class AsyncMcpToolCallbackProvider implements ToolCallbackProvider {
 
-	private final List<McpAsyncClient> mcpClients;
+public class SyncMcpToolCallbackProvider implements ToolCallbackProvider {
 
-	private final BiPredicate<McpAsyncClient, Tool> toolFilter;
+	private final List<McpSyncClient> mcpClients;
+
+	private final BiPredicate<McpSyncClient, Tool> toolFilter;
 
 	/**
-	 * Creates a new {@code AsyncMcpToolCallbackProvider} instance with a list of MCP
+	 * Creates a new {@code SyncMcpToolCallbackProvider} instance with a list of MCP
 	 * clients.
 	 * @param mcpClients the list of MCP clients to use for discovering tools
 	 * @param toolFilter a filter to apply to each discovered tool
 	 */
-	public AsyncMcpToolCallbackProvider(BiPredicate<McpAsyncClient, Tool> toolFilter, List<McpAsyncClient> mcpClients) {
+	public SyncMcpToolCallbackProvider(BiPredicate<McpSyncClient, Tool> toolFilter, List<McpSyncClient> mcpClients) {
 		Assert.notNull(mcpClients, "MCP clients must not be null");
 		Assert.notNull(toolFilter, "Tool filter must not be null");
 		this.mcpClients = mcpClients;
 		this.toolFilter = toolFilter;
 	}
+
 	/**
-	 * Creates a new {@code AsyncMcpToolCallbackProvider} instance that includes only clients
-	 * from the specified allowed servers.
-	 * <p>
-	 * This constructor:
-	 * <ol>
-	 *   <li>Filters the provided MCP clients to only those matching allowed server names</li>
-	 *   <li>Retains all tools from the selected clients (no additional tool filtering)</li>
-	 *   <li>Ensures no null parameters are passed</li>
-	 *   <li>Maintains full asynchronous operation capability</li>
-	 * </ol>
-	 *
-	 * @param mcpClients complete list of available MCP async clients
-	 * @param allowedServerNames set of server names to include (case-sensitive)
-	 * @throws IllegalArgumentException if parameters are null or empty
-	 * @since 1.1.0
-	 */
-	public AsyncMcpToolCallbackProvider(List<McpAsyncClient> mcpClients, Set<String> allowedServerNames) {
-	    Assert.notNull(mcpClients, "MCP clients list must not be null");
-	    Assert.notNull(allowedServerNames, "Allowed server names set must not be null");
-	    Assert.notEmpty(allowedServerNames, "Allowed server names set must not be empty");
-	
-	    this.mcpClients = mcpClients.stream()
-	            .filter(client -> allowedServerNames.contains(client.getServerInfo().name()))
-	            .collect(Collectors.toList()); 
-	    this.toolFilter = (client, tool) -> true;
-	}
-	/**
-	 * Creates a new {@code AsyncMcpToolCallbackProvider} instance with a list of MCP
+	 * Creates a new {@code SyncMcpToolCallbackProvider} instance with a list of MCP
 	 * clients.
-	 * @param mcpClients the list of MCP clients to use for discovering tools. Each client
-	 * typically connects to a different MCP server, allowing tool discovery from multiple
-	 * sources.
-	 * @throws IllegalArgumentException if mcpClients is null
+	 * @param mcpClients the list of MCP clients to use for discovering tools
 	 */
-	public AsyncMcpToolCallbackProvider(List<McpAsyncClient> mcpClients) {
+	public SyncMcpToolCallbackProvider(List<McpSyncClient> mcpClients) {
 		this((mcpClient, tool) -> true, mcpClients);
 	}
 
 	/**
-	 * Creates a new {@code AsyncMcpToolCallbackProvider} instance with one or more MCP
+	 * Creates a new {@code SyncMcpToolCallbackProvider} instance with one or more MCP
 	 * clients.
 	 * @param mcpClients the MCP clients to use for discovering tools
 	 * @param toolFilter a filter to apply to each discovered tool
 	 */
-	public AsyncMcpToolCallbackProvider(BiPredicate<McpAsyncClient, Tool> toolFilter, McpAsyncClient... mcpClients) {
+	public SyncMcpToolCallbackProvider(BiPredicate<McpSyncClient, Tool> toolFilter, McpSyncClient... mcpClients) {
 		this(toolFilter, List.of(mcpClients));
 	}
 
 	/**
-	 * Creates a new {@code AsyncMcpToolCallbackProvider} instance with one or more MCP
+	 * Creates a new {@code SyncMcpToolCallbackProvider} instance with one or more MCP
 	 * clients.
 	 * @param mcpClients the MCP clients to use for discovering tools
 	 */
-	public AsyncMcpToolCallbackProvider(McpAsyncClient... mcpClients) {
+	public SyncMcpToolCallbackProvider(McpSyncClient... mcpClients) {
 		this(List.of(mcpClients));
 	}
 
 	/**
-	 * Discovers and returns all available tools from the configured MCP servers.
+	 * Creates a new {@code SyncMcpToolCallbackProvider} instance that includes only
+	 * clients from the specified allowed servers.
+	 * <p>
+	 * This constructor:
+	 * <ol>
+	 * <li>Filters the provided MCP clients to only those matching allowed server
+	 * names</li>
+	 * <li>Retains all tools from the selected clients (no additional tool filtering)</li>
+	 * <li>Ensures no null parameters are passed</li>
+	 * </ol>
+	 * @param mcpClients complete list of available MCP clients
+	 * @param allowedServerNames set of server names to include (case-sensitive)
+	 * @throws IllegalArgumentException if parameters are null or empty
+	 * @since 1.1.0
+	 */
+	public SyncMcpToolCallbackProvider(List<McpSyncClient> mcpClients, Set<String> allowedServerNames) {
+		Assert.notNull(mcpClients, "MCP clients list must not be null");
+		Assert.notNull(allowedServerNames, "Allowed server names set must not be null");
+		Assert.notEmpty(allowedServerNames, "Allowed server names set must not be empty");
+
+		this.mcpClients = mcpClients.stream()
+			.filter(client -> allowedServerNames.contains(client.getServerInfo().name()))
+			.toList();
+		this.toolFilter = (client, tool) -> true; // No additional filtering
+	}
+
+	/**
+	 * Discovers and returns all available tools from all connected MCP servers.
 	 * <p>
 	 * This method:
 	 * <ol>
-	 * <li>Retrieves the list of tools from each MCP server asynchronously</li>
-	 * <li>Creates a {@link AsyncMcpToolCallback} for each discovered tool</li>
+	 * <li>Retrieves the list of tools from each connected MCP server</li>
+	 * <li>Creates a {@link SyncMcpToolCallback} for each discovered tool</li>
 	 * <li>Validates that there are no duplicate tool names across all servers</li>
 	 * </ol>
-	 * <p>
-	 * Note: While the underlying tool discovery is asynchronous, this method blocks until
-	 * all tools are discovered from all servers.
 	 * @return an array of tool callbacks, one for each discovered tool
 	 * @throws IllegalStateException if duplicate tool names are found
 	 */
 	@Override
 	public ToolCallback[] getToolCallbacks() {
-
-		List<ToolCallback> toolCallbackList = new ArrayList<>();
-
-		for (McpAsyncClient mcpClient : this.mcpClients) {
-
-			ToolCallback[] toolCallbacks = mcpClient.listTools()
-				.map(response -> response.tools()
-					.stream()
-					.filter(tool -> this.toolFilter.test(mcpClient, tool))
-					.map(tool -> new AsyncMcpToolCallback(mcpClient, tool))
-					.toArray(ToolCallback[]::new))
-				.block();
-
-			validateToolCallbacks(toolCallbacks);
-
-			toolCallbackList.addAll(List.of(toolCallbacks));
-		}
-
-		return toolCallbackList.toArray(new ToolCallback[0]);
+		var array = this.mcpClients.stream()
+			.flatMap(mcpClient -> mcpClient.listTools()
+				.tools()
+				.stream()
+				.filter(tool -> this.toolFilter.test(mcpClient, tool))
+				.map(tool -> new SyncMcpToolCallback(mcpClient, tool)))
+			.toArray(ToolCallback[]::new);
+		validateToolCallbacks(array);
+		return array;
 	}
 
 	/**
@@ -204,30 +185,25 @@ public class AsyncMcpToolCallbackProvider implements ToolCallbackProvider {
 	}
 
 	/**
-	 * Creates a reactive stream of tool callbacks from multiple MCP clients.
+	 * Creates a consolidated list of tool callbacks from multiple MCP clients.
 	 * <p>
-	 * This utility method provides a reactive way to work with tool callbacks from
+	 * This utility method provides a convenient way to create tool callbacks from
 	 * multiple MCP clients in a single operation. It:
 	 * <ol>
 	 * <li>Takes a list of MCP clients as input</li>
 	 * <li>Creates a provider instance to manage all clients</li>
-	 * <li>Retrieves tools from all clients asynchronously</li>
-	 * <li>Combines them into a single reactive stream</li>
+	 * <li>Retrieves tools from all clients and combines them into a single list</li>
 	 * <li>Ensures there are no naming conflicts between tools from different clients</li>
 	 * </ol>
-	 * <p>
-	 * Unlike {@link #getToolCallbacks()}, this method provides a fully reactive way to
-	 * work with tool callbacks, making it suitable for non-blocking applications. Any
-	 * errors during tool discovery will be propagated through the returned Flux.
 	 * @param mcpClients the list of MCP clients to create callbacks from
-	 * @return a Flux of tool callbacks from all provided clients
+	 * @return a list of tool callbacks from all provided clients
 	 */
-	public static Flux<ToolCallback> asyncToolCallbacks(List<McpAsyncClient> mcpClients) {
-		if (CollectionUtils.isEmpty(mcpClients)) {
-			return Flux.empty();
-		}
+	public static List<ToolCallback> syncToolCallbacks(List<McpSyncClient> mcpClients) {
 
-		return Flux.fromArray(new AsyncMcpToolCallbackProvider(mcpClients).getToolCallbacks());
+		if (CollectionUtils.isEmpty(mcpClients)) {
+			return List.of();
+		}
+		return List.of((new SyncMcpToolCallbackProvider(mcpClients).getToolCallbacks()));
 	}
 
 }
