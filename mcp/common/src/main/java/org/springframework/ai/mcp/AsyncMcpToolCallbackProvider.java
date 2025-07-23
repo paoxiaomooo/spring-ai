@@ -18,6 +18,7 @@ package org.springframework.ai.mcp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiPredicate;
 
 import io.modelcontextprotocol.client.McpAsyncClient;
